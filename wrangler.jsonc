@@ -1,0 +1,22 @@
+{
+  "name": "eve-agent-demo",
+  "main": "worker.mjs",
+  "compatibility_date": "2025-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "SESSIONS", "class_name": "SessionDO" }
+    ]
+  },
+
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["SessionDO"] }
+  ],
+
+  "vars": {
+    "DEMO_MODEL": "nvidia/meta/llama-3.3-70b-instruct"
+  }
+
+  // Secrets: npx wrangler secret put NVIDIA_API_KEY
+}

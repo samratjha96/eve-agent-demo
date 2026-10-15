@@ -1,11 +1,28 @@
 # eve-agent-demo
 
-A single-file, zero-dependency demo of [Vercel's eve](https://github.com/vercel/eve) agent framework.
+A minimal Lovable-style demo: give it a task, watch an agent plan, delegate to subagents, call real tools, and ship a working site. Backed by **real inference** on `inference-api.nvidia.com` (default `nvidia/meta/llama-3.3-70b-instruct`, override with `DEMO_MODEL`).
 
-Give the agent a mission, watch it plan, delegate to subagents, call typed tools, and write a real website into its sandbox — then see the actual artifact render. Hit **Simulate crash** mid-run and resume from the last durable checkpoint (state persists in localStorage).
+Architecture mirrors [Vercel's eve](https://github.com/vercel/eve): instructions + skills as markdown context, tools as typed functions, parallel subagents, sandboxed file writes, checkpoints between phases — running as a Durable Object per session on Cloudflare.
 
-The session is simulated; the mechanics are faithful to how eve works: an agent is a directory (`instructions.md`, `tools/`, `skills/`, `subagents/`, `sandbox/`), and sessions run as durable workflows.
+**Live:** https://eve-agent-demo.zasamrat.workers.dev
 
-## Run it
+## Layout
 
-Open `index.html` in a browser. No build step, no server, no deps.
+- `engine.mjs` — shared agent loop (plan → parallel subagents → tool-call build → deliver), platform-agnostic
+- `server.mjs` — local Node adapter, zero deps
+- `worker.mjs` — Cloudflare Worker + `SessionDO` Durable Object (state persisted per event, SSE fanout)
+- `index.html` — the UI, bundled into the worker as a Text module
+
+## Run locally
+
+```bash
+NVIDIA_API_KEY=... node server.mjs
+open http://127.0.0.1:8931
+```
+
+## Deploy
+
+```bash
+npx wrangler secret put NVIDIA_API_KEY   # once
+npx wrangler deploy
+```
