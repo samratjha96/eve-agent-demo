@@ -52,15 +52,15 @@ export async function runPipeline(s, io) {
   const { emit, chat } = io;
   const epoch = ++s.epoch;
   const live = () => s.status === 'running' && s.epoch === epoch;
-  const checkpoint = name => emit({ type: 'ckpt', name, file: 'agent.ts' });
+  const checkpoint = name => emit({ type: 'ckpt', name });
   const think = (text, file) => emit({ type: 'think', text, file });
   const say = (text, file) => emit({ type: 'say', text, file });
-  const storeFile = (p, content) => { s.vfs[p] = content; emit({ type: 'vfs_write', path: p, bytes: content.length, file: 'sandbox/sandbox.ts' }); };
+  const storeFile = (p, content) => { s.vfs[p] = content; emit({ type: 'vfs_write', path: p, bytes: content.length }); };
   const model = MODEL.split('/').pop();
 
   try {
     if (s.phase === 0) {
-      emit({ type: 'skill', text: 'loading <b>agent/instructions.md</b> — role: "site-builder agent"', file: 'instructions.md' });
+      emit({ type: 'skill', text: 'initializing agent — role: <b>site-builder</b>' });
       think(`mission received: "${s.mission}" — calling ${model} to plan`);
       const r = await chat([
         { role: 'system', content: INSTRUCTIONS },
@@ -69,13 +69,13 @@ export async function runPipeline(s, io) {
       if (!live()) return;
       s.usage += r.usage?.total_tokens || 0;
       for (const line of r.choices[0].message.content.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 6))
-        say(line.replace(/^[-*•\d.]+\s*/, ''), 'instructions.md');
+        say(line.replace(/^[-*•\d.]+\s*/, ''));
       s.phase = 1; checkpoint('mission-planned');
     }
     if (!live()) return;
 
     if (s.phase === 1) {
-      emit({ type: 'sub', text: 'delegating to <b>subagents/</b> — three parallel model calls', file: 'subagents/researcher' });
+      emit({ type: 'sub', text: 'spawning <b>3 subagents</b> — parallel model calls' });
       const lanes = Object.keys(SUBAGENTS);
       emit({ type: 'lanes', lanes });
       const results = await Promise.all(lanes.map(async name => {
@@ -96,7 +96,7 @@ export async function runPipeline(s, io) {
     if (!live()) return;
 
     if (s.phase === 2) {
-      emit({ type: 'skill', text: 'loading <b>skills/web_copy.md</b> + <b>skills/visual_design.md</b> into build context', file: 'skills/web_copy.md' });
+      emit({ type: 'skill', text: 'loading copy + design playbooks into build context' });
       const ctx = s.subOutputs.map(o => `[${o.name}]\n${o.out}`).join('\n\n');
       const msgs = [
         { role: 'system', content: `${INSTRUCTIONS}\n\n--- skills/web_copy.md ---\n${SKILLS['web_copy.md']}\n\n--- skills/visual_design.md ---\n${SKILLS['visual_design.md']}` },
@@ -105,7 +105,7 @@ export async function runPipeline(s, io) {
       let done = false;
       for (let turn = 0; turn < 8 && live() && !done; turn++) {
         s.turns++;
-        think(`build turn ${turn + 1} — waiting on model…`, 'tools/build_page.ts');
+        think(`build turn ${turn + 1} — waiting on model…`);
         const forceWrite = !s.vfs['index.html'] && turn === 0;
         const r = await chat(msgs, { tools: TOOLS, toolChoice: forceWrite ? { type: 'function', function: { name: 'write_sandbox_file' } } : 'auto', maxTokens: 16000 });
         if (!live()) return;
@@ -122,7 +122,7 @@ export async function runPipeline(s, io) {
         for (const tc of calls) {
           let args = {}; try { args = JSON.parse(tc.function.arguments); } catch {}
           s.toolCalls++;
-          emit({ type: 'tool', name: tc.function.name, args: tc.function.name === 'write_sandbox_file' ? { path: args.path, bytes: (args.content || '').length } : args, file: 'tools/' + tc.function.name + '.ts' });
+          emit({ type: 'tool', name: tc.function.name, args: tc.function.name === 'write_sandbox_file' ? { path: args.path, bytes: (args.content || '').length } : args });
           if (tc.function.name === 'write_sandbox_file' && args.path && args.content) storeFile(args.path, args.content);
           if (tc.function.name === 'finish_mission') { s.summary = args.summary || ''; done = true; }
           msgs.push({ role: 'tool', tool_call_id: tc.id, content: 'ok' });
@@ -134,7 +134,7 @@ export async function runPipeline(s, io) {
     if (!live()) return;
 
     if (s.phase === 3) {
-      emit({ type: 'tool', name: 'deploy_artifact', args: { file: 'index.html', target: 'preview' }, file: 'tools/deploy_artifact.ts' });
+      emit({ type: 'tool', name: 'deploy_artifact', args: { file: 'index.html', target: 'preview' } });
       let html = s.vfs['index.html'];
       for (const [p, c] of Object.entries(s.vfs)) {
         if (p === 'index.html') continue;

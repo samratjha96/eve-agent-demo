@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>eve — give it a task, watch it build</title>
+<title>hateable — give it a task, watch it build</title>
 <style>
   :root {
     --bg: #0a0a0a; --panel: #111; --panel2: #181818; --line: #262626;
@@ -91,14 +91,6 @@
   .lane.done { border-color: #1d3a24; }
   .lane .out { color: #666; margin-top: 3px; }
 
-  .treewrap { border-top: 1px solid var(--line); max-height: 170px; overflow-y: auto; padding: 10px 16px; }
-  .treewrap .cap { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); margin-bottom: 6px; }
-  .tree { font-family: var(--mono); font-size: 11.5px; color: var(--dim); }
-  .tree .f { padding: 2px 5px; border-radius: 4px; transition: all .3s; }
-  .tree .f.active { background: rgba(59,130,246,.15); color: var(--accent); }
-  .tree .d { color: #60a5fa; }
-  .tree .indent { padding-left: 14px; }
-
   /* preview side */
   main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   .browserbar {
@@ -141,7 +133,7 @@
 
 <!-- ============ LANDING ============ -->
 <div class="hero">
-  <div class="wordmark">ev<em>e</em></div>
+  <div class="wordmark"><em>hate</em>able</div>
   <div class="tagline">Give it a task. Watch an agent plan, delegate, and ship a working site — for real.</div>
   <div class="promptbox">
     <textarea id="missionInput" placeholder="Build me a landing page for…" rows="2"></textarea>
@@ -158,7 +150,7 @@
     <button class="chip">a retro synth shop</button>
   </div>
   <div class="herofoot">
-    <b>real inference</b> · gemini-4-argon via inference-api.nvidia.com · real tool calls, real subagents, real artifact · architecture mirrors <a href="https://github.com/vercel/eve">Vercel's eve</a> · <a href="https://github.com/samratjha96/eve-agent-demo">source</a>
+    <b>real inference</b> · gemini-4-argon · real tool calls, real subagents, real artifact · <a href="https://github.com/samratjha96/eve-agent-demo">source</a>
   </div>
 </div>
 
@@ -166,7 +158,7 @@
 <div class="work">
   <aside>
     <div class="ahead">
-      <div class="wm">ev<em>e</em></div>
+      <div class="wm"><em>hate</em>able</div>
       <span class="pill run" id="statusPill">starting</span>
       <div class="right">
         <button class="mini danger" id="crashBtn">crash</button>
@@ -176,15 +168,11 @@
     </div>
     <div class="usermission"><span>task</span><div id="missionEcho"></div></div>
     <div class="feed" id="log"></div>
-    <div class="treewrap">
-      <div class="cap">agent/ — what powers each step</div>
-      <div class="tree" id="tree"></div>
-    </div>
   </aside>
   <main>
     <div class="browserbar">
       <div class="dots"><i></i><i></i><i></i></div>
-      <div class="urlbar" id="urlbar">eve.build/<b>…</b></div>
+      <div class="urlbar" id="urlbar">hateable.build/<b>…</b></div>
       <div class="vfs" id="vfs"></div>
     </div>
     <div class="stage">
@@ -208,34 +196,9 @@ const $ = s => document.querySelector(s);
 const LS_KEY = 'eve-agent-demo-session-id';
 const PHASES = ['planning', 'subagents', 'build', 'deploy'];
 
-const TREE = [
-  ['instructions.md', 'instructions.md'],
-  ['agent.ts', 'agent.ts'],
-  ['tools/', null],
-  ['build_page.ts', 'tools/build_page.ts', 1],
-  ['deploy_artifact.ts', 'tools/deploy_artifact.ts', 1],
-  ['write_sandbox_file.ts', 'tools/write_sandbox_file.ts', 1],
-  ['skills/', null],
-  ['brand_discovery.md', 'skills/brand_discovery.md', 1],
-  ['web_copy.md', 'skills/web_copy.md', 1],
-  ['visual_design.md', 'skills/visual_design.md', 1],
-  ['subagents/', null],
-  ['researcher/', 'subagents/researcher', 1],
-  ['copywriter/', 'subagents/copywriter', 1],
-  ['designer/', 'subagents/designer', 1],
-  ['sandbox/', null],
-  ['sandbox.ts', 'sandbox/sandbox.ts', 1],
-];
-
 let sessionId = null, es = null, running = false, crashed = false, t0 = 0, tickTimer = null;
 
-function renderTree(activePath) {
-  $('#tree').innerHTML = TREE.map(([label, path, ind]) =>
-    `<div class="f ${ind ? 'indent' : ''} ${path && path === activePath ? 'active' : ''} ${label.endsWith('/') ? 'd' : ''}">${label}</div>`
-  ).join('');
-}
-function log(html, cls = 'ev-say', file = null) {
-  if (file) renderTree(file);
+function log(html, cls = 'ev-say') {
   const div = document.createElement('div');
   div.className = 'ev-line ' + cls;
   div.innerHTML = html;
@@ -252,10 +215,10 @@ function startTimer() {
 const stopTimer = () => clearInterval(tickTimer);
 
 const handlers = {
-  think: e => log(e.text, 'ev-think', e.file),
-  say:   e => log(e.text, 'ev-say', e.file),
-  skill: e => log(e.text, 'ev-skill', e.file),
-  sub:   e => log(e.text, 'ev-sub', e.file),
+  think: e => log(e.text, 'ev-think'),
+  say:   e => log(e.text, 'ev-say'),
+  skill: e => log(e.text, 'ev-skill'),
+  sub:   e => log(e.text, 'ev-sub'),
   error: e => { log('server: ' + e.text, 'ev-error'); running = false; crashed = true; stopTimer(); setStatus('error', 'run'); setButtons(); },
   lanes: e => {
     const wrap = document.createElement('div');
@@ -273,17 +236,16 @@ const handlers = {
   },
   tool: e => {
     const args = JSON.stringify(e.args, null, 1);
-    log(`<b>${e.name}</b>(…) <details class="args"><summary>args</summary><pre>${args.replace(/</g,'&lt;')}</pre></details>`, 'ev-tool', e.file);
+    log(`<b>${e.name}</b>(…) <details class="args"><summary>args</summary><pre>${args.replace(/</g,'&lt;')}</pre></details>`, 'ev-tool');
   },
-  ckpt: e => log(`<b>${e.name}</b>`, 'ev-ckpt', e.file),
+  ckpt: e => log(`<b>${e.name}</b>`, 'ev-ckpt'),
   vfs_write: e => {
     const el = document.createElement('span');
     el.className = 'vf';
     el.textContent = `✓ ${e.path} ${(e.bytes/1024).toFixed(1)}kb`;
     $('#vfs').appendChild(el);
     $('#emptyText').textContent = 'agent is writing ' + e.path + '…';
-    renderTree(e.file);
-  },
+      },
   preview: e => {
     $('#emptyPreview').style.display = 'none';
     const pv = $('#preview');
@@ -294,10 +256,9 @@ const handlers = {
     const secs = ((Date.now() - t0) / 1000).toFixed(0);
     const card = document.createElement('div');
     card.className = 'done-card';
-    card.innerHTML = `<b>Built by eve.</b> ${e.summary ? e.summary + '<br>' : ''}The preview is the actual file the model wrote.<div class="stats">${secs}s · ${e.turns} turns · ${e.toolCalls} tool calls · ${e.tokens.toLocaleString()} tokens · ${e.model}</div>`;
+    card.innerHTML = `<b>Built by hateable.</b> ${e.summary ? e.summary + '<br>' : ''}The preview is the actual file the model wrote.<div class="stats">${secs}s · ${e.turns} turns · ${e.toolCalls} tool calls · ${e.tokens.toLocaleString()} tokens · ${e.model}</div>`;
     $('#log').appendChild(card);
     $('#log').scrollTop = $('#log').scrollHeight;
-    renderTree(null);
     running = false; stopTimer(); setStatus('done · ' + secs + 's', 'ok'); setButtons();
     localStorage.removeItem(LS_KEY);
   },
@@ -331,13 +292,13 @@ async function start(mission) {
   $('#preview').style.display = 'none';
   $('#emptyPreview').style.display = 'flex';
   $('#emptyText').textContent = 'agent is working…';
-  renderTree(null); crashed = false;
+  crashed = false;
   document.body.className = 'work';
   setStatus('starting…', 'run');
   const r = await fetch('/api/run', { method: 'POST', body: JSON.stringify({ mission }) });
   const { id } = await r.json();
   sessionId = id; localStorage.setItem(LS_KEY, id);
-  $('#urlbar').innerHTML = 'eve.build/<b>' + id + '</b>';
+  $('#urlbar').innerHTML = 'hateable.build/<b>' + id + '</b>';
   running = true; setButtons(); startTimer();
   attach(id);
 }
@@ -355,14 +316,12 @@ const doResume = async () => {
 };
 $('#crashResumeBtn').onclick = doResume;
 $('#resumeBtn').onclick = doResume;
-
-renderTree(null);
 (async () => {
   const saved = localStorage.getItem(LS_KEY);
   if (!saved) return;
   sessionId = saved;
   document.body.className = 'work';
-  $('#urlbar').innerHTML = 'eve.build/<b>' + saved + '</b>';
+  $('#urlbar').innerHTML = 'hateable.build/<b>' + saved + '</b>';
   $('#missionEcho').textContent = '(reattached session)';
   running = true; crashed = true;
   setButtons(); startTimer();
