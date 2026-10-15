@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>eve-agent-demo — watch an agent work</title>
+<style>
+  :root {
+    --bg: #0a0a0a; --panel: #111; --panel2: #161616; --line: #262626;
+    --text: #ededed; --dim: #888; --accent: #3b82f6; --green: #22c55e;
+    --amber: #f59e0b; --mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.5 -apple-system, 'Segoe UI', sans-serif; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  h1 { font-size: 22px; font-weight: 700; }
+  h1 .ev { color: var(--accent); }
+  .sub { color: var(--dim); font-size: 13px; }
+  .gh { margin-left: auto; font-size: 12.5px; color: var(--dim); text-decoration: none; }
+  .gh:hover { color: var(--text); }
+
+  .mission { display: flex; gap: 8px; align-items: center; margin: 18px 0 16px; flex-wrap: wrap; }
+  .mission input {
+    flex: 1; min-width: 240px; background: var(--panel); border: 1px solid var(--line);
+    color: var(--text); border-radius: 8px; padding: 10px 12px; font-size: 14px; outline: none;
+  }
+  .mission input:focus { border-color: var(--accent); }
+  .chip {
+    background: var(--panel); border: 1px solid var(--line); color: var(--dim);
+    border-radius: 20px; padding: 7px 13px; font-size: 12.5px; cursor: pointer; white-space: nowrap;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--text); }
+  .btn {
+    background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+    padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .btn.ghost { background: var(--panel); border: 1px solid var(--line); color: var(--text); font-weight: 500; }
+  .btn.danger { background: transparent; border: 1px solid #7f1d1d; color: #f87171; }
+
+  .grid { display: grid; grid-template-columns: 220px 1fr 380px; gap: 14px; }
+  @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+
+  .pane { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .pane h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim);
+    padding: 10px 14px; border-bottom: 1px solid var(--line); font-weight: 600;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .pane .body { padding: 12px 14px; overflow-y: auto; flex: 1; }
+  #treePane, #logPane, #sandboxPane { height: 560px; }
+  #logPane .body, #sandboxPane .body { font-family: var(--mono); font-size: 12.5px; }
+
+  /* file tree */
+  .tree { font-family: var(--mono); font-size: 12.5px; color: var(--dim); }
+  .tree .f { padding: 3px 6px; border-radius: 5px; transition: all .3s; }
+  .tree .f.active { background: rgba(59,130,246,.15); color: var(--accent); }
+  .tree .d { color: #60a5fa; }
+  .tree .indent { padding-left: 16px; }
+  .tree-note { margin-top: 14px; font-size: 11px; color: #555; line-height: 1.6; }
+
+  /* log stream */
+  .ev-line { margin-bottom: 9px; animation: fade .25s; }
+  @keyframes fade { from { opacity: 0; transform: translateY(3px); } }
+  .ev-think { color: var(--dim); }
+  .ev-think::before { content: '◦ '; color: var(--dim); }
+  .ev-say { color: var(--text); }
+  .ev-say::before { content: '▸ '; color: var(--accent); }
+  .ev-tool { color: #a78bfa; }
+  .ev-tool .res { color: var(--dim); margin-left: 18px; display: block; }
+  details.args { margin-left: 18px; }
+  details.args summary { color: #555; cursor: pointer; font-size: 11.5px; }
+  details.args pre { color: #666; font-size: 11px; padding: 6px 0 2px; white-space: pre-wrap; }
+  .ev-skill { color: var(--amber); }
+  .ev-skill::before { content: '⚡ '; }
+  .ev-ckpt {
+    color: var(--green); font-size: 11.5px; border-top: 1px dashed #1d3a24;
+    padding-top: 8px; margin-top: 4px;
+  }
+  .ev-ckpt::before { content: '✓ '; }
+  .ev-sub { color: #7dd3fc; }
+  .ev-sub::before { content: '⑂ '; }
+
+  .subagents { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin: 4px 0 10px; }
+  .lane { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 11px; }
+  .lane b { display: block; color: #7dd3fc; font-size: 11px; margin-bottom: 4px; }
+  .lane .st { color: #555; }
+  .lane .st.on { color: var(--text); }
+  .lane.done { border-color: #1d3a24; }
+
+  /* sandbox + preview */
+  .vfs { margin-bottom: 10px; }
+  .vfs .vf { color: var(--dim); padding: 2px 0; }
+  .vfs .vf.writing { color: var(--amber); }
+  .vfs .vf.done { color: var(--green); }
+  #previewWrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  #preview {
+    flex: 1; width: 100%; border: 1px solid var(--line); border-radius: 8px;
+    background: #fff; min-height: 320px;
+  }
+  .empty {
+    flex: 1; border: 1px dashed var(--line); border-radius: 8px; min-height: 320px;
+    display: flex; align-items: center; justify-content: center; color: #555;
+    font-size: 12px; text-align: center; padding: 20px; font-family: -apple-system, sans-serif;
+  }
+
+  /* checkpoint timeline */
+  .timeline { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .ck {
+    font-family: var(--mono); font-size: 11px; padding: 5px 10px; border-radius: 6px;
+    border: 1px solid var(--line); color: #555; background: var(--panel);
+  }
+  .ck.hit { color: var(--green); border-color: #1d3a24; }
+  .elapsed { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--dim); align-self: center; }
+
+  /* overlays */
+  .crash, .restore {
+    position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none;
+    align-items: center; justify-content: center; z-index: 10;
+  }
+  .crash.on, .restore.on { display: flex; }
+  .modal { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 28px 32px; max-width: 420px; text-align: center; }
+  .modal h3 { font-size: 16px; margin-bottom: 8px; }
+  .modal p { color: var(--dim); font-size: 13px; margin-bottom: 18px; }
+  .modal code { font-family: var(--mono); font-size: 11.5px; color: var(--amber); }
+
+  .done-card {
+    background: rgba(34,197,94,.08); border: 1px solid #1d3a24; border-radius: 10px;
+    padding: 12px 14px; color: var(--green); font-family: -apple-system, sans-serif;
+  }
+  .done-card b { color: var(--text); }
+
+  footer { margin-top: 34px; color: #555; font-size: 12px; line-height: 1.7; }
+  footer a { color: var(--dim); }
+  footer a:hover { color: var(--text); }
+  .banner {
+    background: rgba(59,130,246,.08); border: 1px solid rgba(59,130,246,.25);
+    border-radius: 10px; padding: 10px 14px; font-size: 12.5px; color: #93c5fd;
+    margin-bottom: 14px; display: none;
+  }
+  .banner.on { display: block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="ev">eve</span>-agent-demo</h1>
+    <span class="sub">A hands-on look at <a href="https://github.com/vercel/eve" style="color:#93c5fd">Vercel's eve</a>: an agent is a directory, sessions are durable workflows, work is real.</span>
+    <a class="gh" href="https://github.com/samratjha96/eve-agent-demo">github.com/samratjha96/eve-agent-demo ↗</a>
+  </header>
+
+  <div class="banner" id="restoreBanner">Session state found in this browser. The durable workflow checkpoint survived your last visit. Press <b>Resume</b> to continue where the agent left off.</div>
+
+  <div class="mission">
+    <input id="missionInput" placeholder="Give the agent a mission…" value="Launch a coffee brand">
+    <button class="chip" data-m="0">coffee brand</button>
+    <button class="chip" data-m="1">saas pricing page</button>
+    <button class="chip" data-m="2">conference microsite</button>
+    <button class="btn" id="runBtn">Run agent</button>
+    <button class="btn danger" id="crashBtn" disabled>Simulate crash</button>
+    <button class="btn ghost" id="resumeBtn" disabled>Resume</button>
+  </div>
+
+  <div class="grid">
+    <div class="pane" id="treePane">
+      <h2>agent/</h2>
+      <div class="body">
+        <div class="tree" id="tree"></div>
+        <div class="tree-note">In eve, capability = files. Whatever the agent is doing, the file powering it lights up here.</div>
+      </div>
+    </div>
+
+    <div class="pane" id="logPane">
+      <h2>session <span id="sessId" style="font-weight:400"></span></h2>
+      <div class="body" id="log">
+        <div class="ev-line ev-think">Idle. Give the agent a mission and run it.</div>
+      </div>
+    </div>
+
+    <div class="pane" id="sandboxPane">
+      <h2>sandbox → live artifact</h2>
+      <div class="body">
+        <div class="vfs" id="vfs"></div>
+        <div id="previewWrap">
+          <div class="empty" id="emptyPreview">The agent writes real files into its sandbox.<br>When it finishes, what it built renders here — for real.</div>
+          <iframe id="preview" style="display:none" title="agent output"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline" id="timeline"></div>
+
+  <footer>
+    This page is a simulation of an <b>eve</b> session, in pure HTML/CSS/JS. The run is scripted, but the mechanics are real: every step maps to a file in <code>agent/</code>, progress is checkpointed after each phase (state persists in localStorage, so a crash or a closed tab resumes cleanly), subagents work in parallel, and the website the agent writes into its sandbox actually renders — the artifact is genuine. In production, eve runs this on Vercel Workflows with Vercel Sandbox. <a href="https://vercel.com/eve">vercel.com/eve</a> · <a href="https://github.com/vercel/eve">github.com/vercel/eve</a>
+  </footer>
+</div>
+
+<div class="crash" id="crashOverlay">
+  <div class="modal">
+    <h3>Session interrupted</h3>
+    <p>The workflow crashed mid-turn. In eve this isn't fatal: progress was checkpointed at <code id="crashStep"></code>.</p>
+    <button class="btn" id="crashResumeBtn">Resume from checkpoint</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const LS_KEY = 'eve-agent-demo-session';
+
+const TREE = [
+  ['instructions.md', 'instructions.md'],
+  ['agent.ts', 'agent.ts'],
+  ['tools/', null],
+  ['build_page.ts', 'tools/build_page.ts', 1],
+  ['deploy_artifact.ts', 'tools/deploy_artifact.ts', 1],
+  ['research.ts', 'tools/research.ts', 1],
+  ['skills/', null],
+  ['brand_discovery.md', 'skills/brand_discovery.md', 1],
+  ['web_copy.md', 'skills/web_copy.md', 1],
+  ['subagents/', null],
+  ['researcher/', 'subagents/researcher', 1],
+  ['copywriter/', 'subagents/copywriter', 1],
+  ['designer/', 'subagents/designer', 1],
+  ['sandbox/', null],
+  ['sandbox.ts', 'sandbox/sandbox.ts', 1],
+];
+
+const MISSIONS = [
+  {
+    chip: 'coffee brand', input: 'Launch a coffee brand',
+    brand: 'Atlas Roasters', tagline: 'Small-lot coffee, roasted at altitude.',
+    accent: '#b45309', bg: '#faf6f1', ink: '#1c1410',
+    sections: [
+      { h: 'Three origins. One standard.', b: 'We buy at the farm gate from cooperatives in Huila, Yirgacheffe, and Chiapas, then roast in 12kg batches so every lot keeps its character.', items: [['Huila, Colombia', 'Cocoa, panela, red apple'], ['Yirgacheffe, Ethiopia', 'Jasmine, bergamot, apricot'], ['Chiapas, Mexico', 'Toffee, orange, toasted nut']] },
+      { h: 'Roasted Thursday. Ships Friday.', b: 'No warehouse stock. Every bag goes out the day after it leaves the drum, with the roast date printed on the label.' },
+      { h: 'Brew better in five minutes', b: 'Each bag ships with a one-page brew card tuned for that lot: dose, grind, temp, and time for pour-over and immersion.', items: [['Pour-over', '22g · 350ml · 94°C · 3:00'], ['French press', '30g · 500ml · 93°C · 4:00'], ['Espresso', '18g in · 40g out · 26s']] },
+    ],
+    cta: 'Get the first roast', footer: '© 2027 Atlas Roasters · Roasted in Denver, CO',
+  },
+  {
+    chip: 'saas pricing page', input: 'Ship a SaaS pricing page',
+    brand: 'Meterline', tagline: 'Usage-based billing that finance actually trusts.',
+    accent: '#2563eb', bg: '#f8fafc', ink: '#0f172a',
+    sections: [
+      { h: 'Simple tiers. Honest math.', b: 'Every plan includes full API access, audit logs, and export. You pay for what you meter, nothing more.', items: [['Starter · $0', '10k events/mo, 1 project'], ['Growth · $99', '1M events/mo, unlimited projects'], ['Scale · Custom', 'SSO, VPC peering, 99.99% SLA']] },
+      { h: 'Why teams switch', b: 'Stop reconciling invoices against spreadsheets. Meterline prices from the same events stream your engineers already emit.' },
+      { h: 'Common questions', b: 'Straight answers, no sales call required.', items: [['Do you rate-limit?', 'No. Overage is billed, never dropped.'], ['Can I self-host?', 'Scale tier supports in-VPC deploy.'], ['Contract terms?', 'Monthly. Cancel anytime.']] },
+    ],
+    cta: 'Start metering free', footer: '© 2027 Meterline Inc · SOC 2 Type II',
+  },
+  {
+    chip: 'conference microsite', input: 'Build a conference microsite',
+    brand: 'OrbitConf 2027', tagline: 'Three days on the future of infrastructure. March 18–20 · Austin, TX.',
+    accent: '#7c3aed', bg: '#fafaff', ink: '#181022',
+    sections: [
+      { h: 'This year’s speakers', b: 'Operators and engineers who run the systems everyone else builds on.', items: [['R. Okafor', 'Planet-scale queues at Meridian'], ['L. Zhang', 'Postmortem culture that works'], ['D. Mbeki', 'The post-Kubernetes data plane'], ['+ 24 more', 'Full lineup announced weekly']] },
+      { h: 'Schedule at a glance', b: 'Single-track main stage by day, hands-on workshops in the evenings.', items: [['Day 1', 'Keynotes + platform track'], ['Day 2', 'Reliability + data tracks'], ['Day 3', 'Workshops + closing panel']] },
+      { h: 'Why people come back', b: 'No sponsor talks, no recorded-sales-pitch keynotes. Talks are chosen by practitioners, and every speaker stays for the hallway track.' },
+    ],
+    cta: 'Early-bird tickets', footer: '© 2027 OrbitConf · Austin Convention Center',
+  },
+];
+
+let running = false, crashed = false, stepIdx = 0, mission = null;
+let vfs = {}, checkpointsHit = [], t0 = 0, tickTimer = null, sessId = '';
+
+/* ---------- tree ---------- */
+function renderTree(activePath) {
+  $('#tree').innerHTML = TREE.map(([label, path, ind]) =>
+    `<div class="f ${ind ? 'indent' : ''} ${path && path === activePath ? 'active' : ''} ${label.endsWith('/') ? 'd' : ''}">${label}</div>`
+  ).join('');
+}
+
+/* ---------- log ---------- */
+function log(html, cls = 'ev-say', file = null) {
+  if (file) renderTree(file);
+  const div = document.createElement('div');
+  div.className = 'ev-line ' + cls;
+  div.innerHTML = html;
+  $('#log').appendChild(div);
+  $('#log').scrollTop = $('#log').scrollHeight;
+}
+
+function checkpoint(name) {
+  checkpointsHit.push(name);
+  const chips = $('#timeline');
+  const el = document.createElement('div');
+  el.className = 'ck hit';
+  el.textContent = '⬢ ' + name;
+  chips.appendChild(el);
+  log(`workflow checkpoint: <b>${name}</b> — session state persisted`, 'ev-ckpt', 'agent.ts');
+  saveState();
+}
+
+/* ---------- sandbox ---------- */
+function vfsWrite(path, content) {
+  vfs[path] = content;
+  const el = document.createElement('div');
+  el.className = 'vf writing';
+  el.dataset.path = path;
+  el.textContent = '▸ ' + path + '  (writing…)';
+  $('#vfs').appendChild(el);
+  renderTree('sandbox/sandbox.ts');
+  return el;
+}
+function vfsDone(el, path) {
+  el.className = 'vf done';
+  el.textContent = '✓ ' + path + '  (' + vfs[path].length + ' bytes)';
+}
+
+/* ---------- artifact generation (real output) ---------- */
+function buildSite(m) {
+  const sec = m.sections.map(s => `
+    <section><h2>${s.h}</h2><p>${s.b}</p>
+    ${s.items ? `<div class="cards">${s.items.map(([t, d]) => `<div class="card"><b>${t}</b><span>${d}</span></div>`).join('')}</div>` : ''}
+    </section>`).join('');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${m.brand}</title><style>
+    *{box-sizing:border-box;margin:0;padding:0}body{font:16px/1.6 -apple-system,'Segoe UI',sans-serif;color:${m.ink};background:${m.bg}}
+    .hero{background:linear-gradient(135deg,${m.accent},${m.ink});color:#fff;padding:72px 8vw;text-align:center}
+    .hero h1{font-size:clamp(28px,5vw,48px);letter-spacing:-.02em}.hero p{opacity:.85;margin-top:10px;font-size:17px}
+    .cta{display:inline-block;margin-top:26px;background:#fff;color:${m.accent};font-weight:700;padding:13px 30px;border-radius:30px;text-decoration:none}
+    section{max-width:880px;margin:0 auto;padding:52px 24px 8px}section h2{font-size:22px;margin-bottom:8px}section p{color:#555}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:20px}
+    .card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:16px}.card b{display:block;margin-bottom:4px}.card span{color:#777;font-size:14px}
+    footer{text-align:center;color:#999;font-size:13px;padding:44px 0 30px}
+  </style></head><body>
+    <div class="hero"><h1>${m.brand}</h1><p>${m.tagline}</p><a class="cta" href="#">${m.cta}</a></div>
+    ${sec}<footer>${m.footer}</footer></body></html>`;
+}
+
+/* ---------- session steps ---------- */
+async function runSession(fromStep) {
+  const m = mission;
+  const steps = [
+    async () => {
+      renderTree('instructions.md');
+      log(`loading <b>agent/instructions.md</b> — role: "You are a site-builder agent. Turn a mission into a finished, working web page."`, 'ev-say', 'instructions.md');
+      await sleep(700);
+      log(`mission received: "${m.input}"`, 'ev-say');
+      await sleep(500);
+      log('decomposing… need: brand facts → copy → design tokens → page build → deliverable', 'ev-think');
+      await sleep(600);
+    },
+    async () => {
+      log('loading <b>skills/brand_discovery.md</b> (relevant to this mission)', 'ev-skill', 'skills/brand_discovery.md');
+      await sleep(650);
+      log(`brand extracted: <b>${m.brand}</b> — "${m.tagline}"`, 'ev-say');
+      await sleep(400);
+    },
+    () => checkpoint('mission-planned'),
+    async () => {
+      log('delegating to <b>subagents/</b> — three lanes in parallel', 'ev-sub', 'subagents/researcher');
+      const wrap = document.createElement('div');
+      wrap.className = 'subagents';
+      wrap.innerHTML = ['researcher', 'copywriter', 'designer'].map(n =>
+        `<div class="lane" id="lane-${n}"><b>${n}/</b><div class="st on" id="st-${n}">starting…</div></div>`).join('');
+      $('#log').appendChild(wrap);
+      const lanes = {
+        researcher: [`market scan: ${m.brand.toLowerCase()} space`, 'positioning: premium + craft', 'facts ready'],
+        copywriter: ['drafting hero copy', 'writing 3 sections', 'copy ready'],
+        designer: [`palette: ${m.accent} on ${m.bg}`, 'type scale + card grid', 'tokens ready'],
+      };
+      const jobs = Object.entries(lanes).map(([name, msgs], li) => (async () => {
+        for (let i = 0; i < msgs.length; i++) {
+          await sleep(700 + li * 260 + i * 620);
+          if (crashed) return;
+          $('#st-' + name).textContent = msgs[i];
+        }
+        $('#lane-' + name).classList.add('done');
+      })());
+      await Promise.all(jobs);
+      if (crashed) return;
+      log('subagents returned — artifacts merged into plan', 'ev-sub');
+      await sleep(300);
+    },
+    () => checkpoint('subagents-merged'),
+    async () => {
+      log(`<b>tools/research.ts</b>({ query: "${m.brand} positioning" })`, 'ev-tool', 'tools/research.ts');
+      await sleep(500);
+      log(`<span class="res">→ { audience: "early adopters", tone: "confident, plain-spoken", refs: 3 }</span>`, 'ev-tool');
+      await sleep(350);
+      log('<b>tools/build_page.ts</b>({ brand, copy, tokens }) — composing page sections', 'ev-tool', 'tools/build_page.ts');
+      await sleep(650);
+      log(`<span class="res">→ { sections: ${m.sections.length}, bytes: ~${buildSite(m).length} }</span>`, 'ev-tool');
+      await sleep(300);
+    },
+    async () => {
+      log('writing build output into the sandbox filesystem…', 'ev-say', 'sandbox/sandbox.ts');
+      const full = buildSite(m);
+      const el = vfsWrite('index.html', '');
+      await sleep(600);
+      // progressive write: append in slices so the file visibly grows
+      const parts = 4, step = Math.ceil(full.length / parts);
+      for (let i = 1; i <= parts; i++) {
+        if (crashed) return;
+        vfs['index.html'] = full.slice(0, i * step);
+        el.textContent = `▸ index.html  (${vfs['index.html'].length} bytes…)`;
+        await sleep(420);
+      }
+      vfsDone(el, 'index.html');
+      await sleep(250);
+      log(`sandbox write complete: index.html (${full.length} bytes)`, 'ev-say');
+    },
+    () => checkpoint('artifact-written'),
+    async () => {
+      log('<b>tools/deploy_artifact.ts</b>({ file: "index.html", target: "preview" })', 'ev-tool', 'tools/deploy_artifact.ts');
+      await sleep(700);
+      log('<span class="res">→ { status: "live", render: "iframe" }</span>', 'ev-tool');
+      await sleep(400);
+      $('#emptyPreview').style.display = 'none';
+      const pv = $('#preview');
+      pv.style.display = 'block';
+      pv.srcdoc = vfs['index.html'];
+      const card = document.createElement('div');
+      card.className = 'done-card';
+      card.innerHTML = `<b>Mission complete.</b> The agent planned, delegated to 3 subagents, ran 3 tool calls, and wrote a working site into its sandbox. That preview is the actual file it produced — not a mockup.`;
+      $('#log').appendChild(card);
+      $('#log').scrollTop = $('#log').scrollHeight;
+      renderTree(null);
+    },
+  ];
+
+  for (stepIdx = fromStep; stepIdx < steps.length; stepIdx++) {
+    if (crashed) { saveState(); return; }
+    await steps[stepIdx]();
+  }
+  stepIdx = steps.length;
+  running = false;
+  localStorage.removeItem(LS_KEY);
+  setButtons();
+  clearInterval(tickTimer);
+}
+
+/* ---------- persistence ---------- */
+function saveState() {
+  localStorage.setItem(LS_KEY, JSON.stringify({
+    stepIdx, mission: mission && mission.input, missionIdx: MISSIONS.indexOf(mission),
+    log: $('#log').innerHTML, vfsHtml: $('#vfs').innerHTML, vfsData: vfs, ckpts: checkpointsHit,
+  }));
+}
+function restoreState() {
+  const raw = localStorage.getItem(LS_KEY);
+  if (!raw) return false;
+  try {
+    const s = JSON.parse(raw);
+    if (s.stepIdx == null || s.stepIdx >= 8) return false;
+    mission = MISSIONS[s.missionIdx] ?? null;
+    if (!mission) return false;
+    stepIdx = s.stepIdx; vfs = s.vfsData || {}; checkpointsHit = s.ckpts || [];
+    $('#log').innerHTML = s.log; $('#vfs').innerHTML = s.vfsHtml;
+    $('#missionInput').value = mission.input;
+    checkpointsHit.forEach(n => { const e = document.createElement('div'); e.className = 'ck hit'; e.textContent = '⬢ ' + n; $('#timeline').appendChild(e); });
+    $('#restoreBanner').classList.add('on');
+    $('#resumeBtn').disabled = false;
+    sessId = 'ses_restored';
+    $('#sessId').textContent = '· ' + sessId;
+    return true;
+  } catch { return false; }
+}
+
+/* ---------- controls ---------- */
+function setButtons() {
+  $('#runBtn').disabled = running;
+  $('#crashBtn').disabled = !running;
+  $('#resumeBtn').disabled = running || stepIdx >= 8 || !mission;
+}
+function startTimer() {
+  t0 = Date.now();
+  clearInterval(tickTimer);
+  tickTimer = setInterval(() => {
+    $('.elapsed').textContent = ((Date.now() - t0) / 1000).toFixed(1) + 's';
+  }, 100);
+}
+
+function start(mIdx) {
+  mission = MISSIONS[mIdx];
+  $('#missionInput').value = mission.input;
+  $('#log').innerHTML = ''; $('#vfs').innerHTML = ''; $('#timeline').innerHTML = '<div class="elapsed"></div>';
+  $('#preview').style.display = 'none'; $('#emptyPreview').style.display = 'flex';
+  vfs = {}; checkpointsHit = []; stepIdx = 0; crashed = false; running = true;
+  sessId = 'ses_' + Math.random().toString(36).slice(2, 8);
+  $('#sessId').textContent = '· ' + sessId;
+  $('#restoreBanner').classList.remove('on');
+  setButtons(); startTimer();
+  localStorage.removeItem(LS_KEY);
+  runSession(0);
+}
+
+$('#runBtn').onclick = () => {
+  const m = MISSIONS.findIndex(x => x.input === $('#missionInput').value.trim());
+  start(m >= 0 ? m : 0);
+};
+document.querySelectorAll('.chip').forEach(c => c.onclick = () => { $('#missionInput').value = MISSIONS[+c.dataset.m].input; });
+$('#crashBtn').onclick = () => {
+  crashed = true; running = false;
+  $('#crashStep').textContent = `step ${stepIdx + 1} of 8`;
+  $('#crashOverlay').classList.add('on');
+  setButtons(); clearInterval(tickTimer);
+};
+const doResume = () => {
+  $('#crashOverlay').classList.remove('on');
+  $('#restoreBanner').classList.remove('on');
+  crashed = false; running = true;
+  setButtons(); startTimer();
+  runSession(stepIdx);
+};
+$('#crashResumeBtn').onclick = doResume;
+$('#resumeBtn').onclick = doResume;
+
+renderTree(null);
+restoreState();
+</script>
+</body>
+</html>
