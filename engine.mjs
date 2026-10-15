@@ -1,7 +1,7 @@
 // Shared agent engine — used by server.mjs (local Node) and worker.mjs (Cloudflare DO).
 // runPipeline() drives a session object; the host adapter supplies emit() and liveness.
 
-export const MODEL = 'nvidia/meta/llama-3.3-70b-instruct';
+export const MODEL = 'gcp/google/gemini-4-argon';
 const API = 'https://inference-api.nvidia.com/v1/chat/completions';
 
 export function createChat(apiKey, model = MODEL) {

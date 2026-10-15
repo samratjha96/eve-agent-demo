@@ -1,6 +1,6 @@
 # eve-agent-demo
 
-A minimal Lovable-style demo: give it a task, watch an agent plan, delegate to subagents, call real tools, and ship a working site. Backed by **real inference** on `inference-api.nvidia.com` (default `nvidia/meta/llama-3.3-70b-instruct`, override with `DEMO_MODEL`).
+A minimal Lovable-style demo: give it a task, watch an agent plan, delegate to subagents, call real tools, and ship a working site. Backed by **real inference** on `inference-api.nvidia.com` (default `gcp/google/gemini-4-argon`, override with `DEMO_MODEL`).
 
 Architecture mirrors [Vercel's eve](https://github.com/vercel/eve): instructions + skills as markdown context, tools as typed functions, parallel subagents, sandboxed file writes, checkpoints between phases — running as a Durable Object per session on Cloudflare.
 

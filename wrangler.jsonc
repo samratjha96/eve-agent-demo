@@ -15,7 +15,7 @@
   ],
 
   "vars": {
-    "DEMO_MODEL": "nvidia/meta/llama-3.3-70b-instruct"
+    "DEMO_MODEL": "gcp/google/gemini-4-argon"
   }
 
   // Secrets: npx wrangler secret put NVIDIA_API_KEY
